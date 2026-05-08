@@ -40,6 +40,12 @@ const TASKS: Task[] = [
     adUrl: "https://omg10.com/4/10970856",
     videoUrl: "https://youtu.be/diR0AnDaBlM?si=A8eq40NHi52g1Am5",
   },
+  {
+    id: "task4",
+    title: "Task 4",
+    adUrl: "https://www.profitablecpmratenetwork.com/jjinsj1h2v?key=15e360c0e974dce88867b96383c9c1f5",
+    videoUrl: "https://youtu.be/dQw4w9WgXcQ",
+  },
 ];
 
 function TasksPage() {
