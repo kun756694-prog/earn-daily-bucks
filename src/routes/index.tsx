@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
 import { dailyCheckin, claimAdReward } from "@/lib/points.functions";
 import { toast } from "sonner";
+import { BonusButton } from "@/components/BonusButton";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -22,7 +23,10 @@ function HomePage() {
       {!user && !loading && <SignedOutCTA />}
       {user && (
         <section className="mt-12">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-6">Ways to earn</h2>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold">Ways to earn</h2>
+            <BonusButton onDone={refreshProfile as any} />
+          </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
             <CheckinCard profile={profile} onDone={refreshProfile} />
             <WatchAdCard onDone={refreshProfile} />
