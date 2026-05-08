@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Coins, Loader2, ExternalLink, CheckCircle2, Youtube } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { claimTaskReward } from "@/lib/points.functions";
+import { claimTaskReward, startTask } from "@/lib/points.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -110,6 +110,7 @@ type Phase = "idle" | "ad" | "video" | "claiming" | "done";
 
 function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClaimed: () => Promise<void> }) {
   const claim = useServerFn(claimTaskReward);
+  const begin = useServerFn(startTask);
   const [phase, setPhase] = useState<Phase>(done ? "done" : "idle");
   const [seconds, setSeconds] = useState(15);
 
@@ -127,7 +128,13 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
     return () => clearInterval(i);
   }, [phase]);
 
-  const start = () => {
+  const start = async () => {
+    try {
+      await begin({ data: { taskId: task.id } });
+    } catch {
+      toast.error("Could not start task. Please try again.");
+      return;
+    }
     window.open(task.adUrl, "_blank", "noopener,noreferrer");
     setPhase("ad");
   };
@@ -137,11 +144,15 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
     setPhase("claiming");
     try {
       const res = await claim({ data: { taskId: task.id } });
-      if (!res.ok) toast.error("Already claimed");
-      else { toast.success(`${task.title} complete +20 points`); await onClaimed(); }
+      if (!res.ok) {
+        if (res.reason === "too_soon") toast.error("Please wait 15 seconds first");
+        else if (res.reason === "not_started") toast.error("Start the task first");
+        else if (res.reason === "already_claimed") toast.error("Already claimed");
+        else toast.error("Could not claim reward");
+      } else { toast.success(`${task.title} complete +20 points`); await onClaimed(); }
       setPhase("done");
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to claim");
+    } catch {
+      toast.error("Failed to claim");
       setPhase("video");
     }
   };

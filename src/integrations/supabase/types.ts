@@ -98,6 +98,24 @@ export type Database = {
         }
         Relationships: []
       }
+      task_starts: {
+        Row: {
+          started_at: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          started_at?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          started_at?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -164,12 +182,36 @@ export type Database = {
         Args: { _delta: number; _reason: string; _target: string }
         Returns: number
       }
+      claim_ad_reward_atomic: {
+        Args: { _ad_type: string; _amount: number; _user_id: string }
+        Returns: {
+          ok: boolean
+          points: number
+          reason: string
+        }[]
+      }
+      claim_bonus_reward_atomic: {
+        Args: { _amount: number; _user_id: string }
+        Returns: {
+          ok: boolean
+          points: number
+          reason: string
+        }[]
+      }
       claim_daily_checkin: {
         Args: { _amount: number; _user_id: string }
         Returns: {
           claimed: boolean
           next_at: string
           points: number
+        }[]
+      }
+      claim_task_reward_atomic: {
+        Args: { _amount: number; _task_id: string; _user_id: string }
+        Returns: {
+          ok: boolean
+          points: number
+          reason: string
         }[]
       }
       has_role: {
@@ -195,6 +237,10 @@ export type Database = {
           ok: boolean
           reason: string
         }[]
+      }
+      start_task: {
+        Args: { _task_id: string; _user_id: string }
+        Returns: string
       }
     }
     Enums: {

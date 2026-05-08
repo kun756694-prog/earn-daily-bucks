@@ -2,6 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
+// Map raw DB errors to a generic, safe message before they reach the client.
+function safeError(err: unknown, fallback = "Something went wrong. Please try again."): never {
+  console.error("[server-fn]", err);
+  throw new Error(fallback);
+}
+
 export const dailyCheckin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -9,7 +15,7 @@ export const dailyCheckin = createServerFn({ method: "POST" })
     const { data, error } = await supabase.rpc("claim_daily_checkin", {
       _user_id: userId, _amount: 10,
     });
-    if (error) throw new Error(error.message);
+    if (error) safeError(error);
     const row = Array.isArray(data) ? data[0] : data;
     if (!row?.claimed) {
       return { ok: false as const, reason: "cooldown", nextAt: new Date(row?.next_at).getTime() };
@@ -25,24 +31,23 @@ export const claimAdReward = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ adType: z.string().min(1).max(64) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    // Rate limit: max 1 ad reward per minute
-    const since = new Date(Date.now() - 60_000).toISOString();
-    const { count } = await supabase
-      .from("ad_views")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", since);
-    if ((count ?? 0) > 0) {
-      return { ok: false as const, reason: "rate_limited" };
-    }
-
-    await supabase.from("ad_views").insert({ user_id: userId, ad_type: data.adType });
-    const { data: newPoints, error } = await supabase.rpc("increment_points", { _user_id: userId, _delta: 20 });
-    if (error) throw new Error(error.message);
-    await supabase.from("points_transactions").insert({
-      user_id: userId, amount: 20, type: "ad_view", reason: `Watched ${data.adType}`,
+    const { data: rpc, error } = await supabase.rpc("claim_ad_reward_atomic", {
+      _user_id: userId, _ad_type: data.adType, _amount: 20,
     });
-    return { ok: true as const, points: newPoints };
+    if (error) safeError(error);
+    const row = Array.isArray(rpc) ? rpc[0] : rpc;
+    if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
+    return { ok: true as const, points: row.points };
+  });
+
+export const startTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ taskId: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase.rpc("start_task", { _user_id: userId, _task_id: data.taskId });
+    if (error) safeError(error);
+    return { ok: true as const };
   });
 
 export const claimTaskReward = createServerFn({ method: "POST" })
@@ -50,49 +55,26 @@ export const claimTaskReward = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ taskId: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const adType = `task_${data.taskId}`;
-
-    // Prevent claiming the same task twice
-    const { data: existing } = await supabase
-      .from("ad_views")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("ad_type", adType)
-      .maybeSingle();
-    if (existing) {
-      return { ok: false as const, reason: "already_claimed" };
-    }
-
-    await supabase.from("ad_views").insert({ user_id: userId, ad_type: adType });
-    const { data: newPoints, error } = await supabase.rpc("increment_points", { _user_id: userId, _delta: 20 });
-    if (error) throw new Error(error.message);
-    await supabase.from("points_transactions").insert({
-      user_id: userId, amount: 20, type: "task", reason: `Completed ${data.taskId}`,
+    const { data: rpc, error } = await supabase.rpc("claim_task_reward_atomic", {
+      _user_id: userId, _task_id: data.taskId, _amount: 20,
     });
-    return { ok: true as const, points: newPoints };
+    if (error) safeError(error);
+    const row = Array.isArray(rpc) ? rpc[0] : rpc;
+    if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
+    return { ok: true as const, points: row.points };
   });
 
 export const claimBonusReward = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    // Rate limit: 1 bonus click per 30 seconds
-    const since = new Date(Date.now() - 30_000).toISOString();
-    const { count } = await supabase
-      .from("ad_views")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("ad_type", "bonus_click")
-      .gte("created_at", since);
-    if ((count ?? 0) > 0) return { ok: false as const, reason: "rate_limited" };
-
-    await supabase.from("ad_views").insert({ user_id: userId, ad_type: "bonus_click" });
-    const { data: newPoints, error } = await supabase.rpc("increment_points", { _user_id: userId, _delta: 10 });
-    if (error) throw new Error(error.message);
-    await supabase.from("points_transactions").insert({
-      user_id: userId, amount: 10, type: "bonus", reason: "Bonus ad click",
+    const { data: rpc, error } = await supabase.rpc("claim_bonus_reward_atomic", {
+      _user_id: userId, _amount: 10,
     });
-    return { ok: true as const, points: newPoints };
+    if (error) safeError(error);
+    const row = Array.isArray(rpc) ? rpc[0] : rpc;
+    if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
+    return { ok: true as const, points: row.points };
   });
 
 const POINTS_PER_TON = 20000;
@@ -113,7 +95,7 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
       _points: pointsNeeded,
       _ton_address: data.tonAddress,
     });
-    if (error) throw new Error(error.message);
+    if (error) safeError(error);
     const row = Array.isArray(rpc) ? rpc[0] : rpc;
     if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
     return { ok: true as const, points: row.new_points };
@@ -131,7 +113,7 @@ export const adminAdjustPoints = createServerFn({ method: "POST" })
     const { data: newPoints, error } = await supabase.rpc("admin_adjust_points", {
       _target: data.targetUserId, _delta: data.delta, _reason: data.reason,
     });
-    if (error) throw new Error(error.message);
+    if (error) safeError(error);
     return { ok: true as const, points: newPoints };
   });
 
