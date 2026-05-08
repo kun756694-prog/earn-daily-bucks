@@ -2,39 +2,22 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
-const COOLDOWN_MS = 24 * 60 * 60 * 1000;
-
 export const dailyCheckin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("points,last_checkin_at")
-      .eq("id", userId)
-      .maybeSingle();
-    if (error || !profile) throw new Error("Profile not found");
-
-    if (profile.last_checkin_at) {
-      const last = new Date(profile.last_checkin_at).getTime();
-      if (Date.now() - last < COOLDOWN_MS) {
-        const nextAt = last + COOLDOWN_MS;
-        return { ok: false as const, reason: "cooldown", nextAt };
-      }
+    const { data, error } = await supabase.rpc("claim_daily_checkin", {
+      _user_id: userId, _amount: 10,
+    });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.claimed) {
+      return { ok: false as const, reason: "cooldown", nextAt: new Date(row?.next_at).getTime() };
     }
-
-    const newPoints = (profile.points ?? 0) + 10;
-    const { error: upErr } = await supabase
-      .from("profiles")
-      .update({ points: newPoints, last_checkin_at: new Date().toISOString() })
-      .eq("id", userId);
-    if (upErr) throw new Error(upErr.message);
-
     await supabase.from("points_transactions").insert({
       user_id: userId, amount: 10, type: "checkin", reason: "Daily check-in",
     });
-
-    return { ok: true as const, points: newPoints };
+    return { ok: true as const, points: row.points };
   });
 
 export const claimAdReward = createServerFn({ method: "POST" })
@@ -54,10 +37,8 @@ export const claimAdReward = createServerFn({ method: "POST" })
     }
 
     await supabase.from("ad_views").insert({ user_id: userId, ad_type: data.adType });
-
-    const { data: prof } = await supabase.from("profiles").select("points").eq("id", userId).maybeSingle();
-    const newPoints = (prof?.points ?? 0) + 20;
-    await supabase.from("profiles").update({ points: newPoints }).eq("id", userId);
+    const { data: newPoints, error } = await supabase.rpc("increment_points", { _user_id: userId, _delta: 20 });
+    if (error) throw new Error(error.message);
     await supabase.from("points_transactions").insert({
       user_id: userId, amount: 20, type: "ad_view", reason: `Watched ${data.adType}`,
     });
@@ -83,10 +64,8 @@ export const claimTaskReward = createServerFn({ method: "POST" })
     }
 
     await supabase.from("ad_views").insert({ user_id: userId, ad_type: adType });
-
-    const { data: prof } = await supabase.from("profiles").select("points").eq("id", userId).maybeSingle();
-    const newPoints = (prof?.points ?? 0) + 20;
-    await supabase.from("profiles").update({ points: newPoints }).eq("id", userId);
+    const { data: newPoints, error } = await supabase.rpc("increment_points", { _user_id: userId, _delta: 20 });
+    if (error) throw new Error(error.message);
     await supabase.from("points_transactions").insert({
       user_id: userId, amount: 20, type: "task", reason: `Completed ${data.taskId}`,
     });
@@ -108,9 +87,8 @@ export const claimBonusReward = createServerFn({ method: "POST" })
     if ((count ?? 0) > 0) return { ok: false as const, reason: "rate_limited" };
 
     await supabase.from("ad_views").insert({ user_id: userId, ad_type: "bonus_click" });
-    const { data: prof } = await supabase.from("profiles").select("points").eq("id", userId).maybeSingle();
-    const newPoints = (prof?.points ?? 0) + 10;
-    await supabase.from("profiles").update({ points: newPoints }).eq("id", userId);
+    const { data: newPoints, error } = await supabase.rpc("increment_points", { _user_id: userId, _delta: 10 });
+    if (error) throw new Error(error.message);
     await supabase.from("points_transactions").insert({
       user_id: userId, amount: 10, type: "bonus", reason: "Bonus ad click",
     });
@@ -129,38 +107,16 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const pointsNeeded = data.tonAmount * POINTS_PER_TON;
-
-    const { data: prof } = await supabase
-      .from("profiles").select("points").eq("id", userId).maybeSingle();
-    if (!prof) throw new Error("Profile not found");
-    if ((prof.points ?? 0) < pointsNeeded) {
-      return { ok: false as const, reason: "insufficient_points" };
-    }
-
-    // Block if there's already a pending withdrawal
-    const { count: pendingCount } = await supabase
-      .from("withdrawals")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "pending");
-    if ((pendingCount ?? 0) > 0) {
-      return { ok: false as const, reason: "pending_exists" };
-    }
-
-    const newPoints = prof.points - pointsNeeded;
-    await supabase.from("profiles").update({ points: newPoints }).eq("id", userId);
-    await supabase.from("withdrawals").insert({
-      user_id: userId,
-      ton_address: data.tonAddress,
-      points_spent: pointsNeeded,
-      ton_amount: data.tonAmount,
-      status: "pending",
+    const { data: rpc, error } = await supabase.rpc("request_withdrawal_atomic", {
+      _user_id: userId,
+      _ton_amount: data.tonAmount,
+      _points: pointsNeeded,
+      _ton_address: data.tonAddress,
     });
-    await supabase.from("points_transactions").insert({
-      user_id: userId, amount: -pointsNeeded, type: "withdrawal",
-      reason: `Withdrawal request: ${data.tonAmount} TON`,
-    });
-    return { ok: true as const, points: newPoints };
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(rpc) ? rpc[0] : rpc;
+    if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
+    return { ok: true as const, points: row.new_points };
   });
 
 export const adminAdjustPoints = createServerFn({ method: "POST" })
@@ -171,16 +127,46 @@ export const adminAdjustPoints = createServerFn({ method: "POST" })
     reason: z.string().min(1).max(500),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: newPoints, error } = await supabase.rpc("admin_adjust_points", {
+      _target: data.targetUserId, _delta: data.delta, _reason: data.reason,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true as const, points: newPoints };
+  });
+
+// Admin-only: fetch the data shown in the admin panel. Re-checks role server-side.
+export const adminLoad = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
     if (!roles?.some((r) => r.role === "admin")) throw new Error("Forbidden");
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id,email,points,created_at,last_login_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count } = await supabase
+      .from("ad_views")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", since);
+    return { profiles: profiles ?? [], adViewsToday: count ?? 0 };
+  });
 
-    const { data: prof } = await supabase.from("profiles").select("points").eq("id", data.targetUserId).maybeSingle();
-    if (!prof) throw new Error("User not found");
-    const newPoints = Math.max(0, (prof.points ?? 0) + data.delta);
-    await supabase.from("profiles").update({ points: newPoints }).eq("id", data.targetUserId);
-    await supabase.from("points_transactions").insert({
-      user_id: data.targetUserId, amount: data.delta, type: "admin_adjust", reason: data.reason,
-    });
-    return { ok: true as const, points: newPoints };
+export const adminUserHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ targetUserId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+    if (!roles?.some((r) => r.role === "admin")) throw new Error("Forbidden");
+    const { data: items } = await supabase
+      .from("points_transactions")
+      .select("*")
+      .eq("user_id", data.targetUserId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    return { items: items ?? [] };
   });

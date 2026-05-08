@@ -1,12 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
-import { adminAdjustPoints } from "@/lib/points.functions";
+import { adminAdjustPoints, adminLoad, adminUserHistory } from "@/lib/points.functions";
 import { toast } from "sonner";
 import { Users, Coins, TrendingUp, Loader2 } from "lucide-react";
 import {
@@ -29,6 +28,7 @@ function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [adViewsToday, setAdViewsToday] = useState(0);
   const [search, setSearch] = useState("");
+  const loadFn = useServerFn(adminLoad);
 
   useEffect(() => {
     if (loading) return;
@@ -36,15 +36,13 @@ function AdminPage() {
   }, [user, isAdmin, loading, nav]);
 
   const load = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id,email,points,created_at,last_login_at")
-      .order("created_at", { ascending: false })
-      .limit(500);
-    setRows((data as Row[]) ?? []);
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count } = await supabase.from("ad_views").select("id", { count: "exact", head: true }).gte("created_at", since);
-    setAdViewsToday(count ?? 0);
+    try {
+      const res = await loadFn();
+      setRows((res.profiles as Row[]) ?? []);
+      setAdViewsToday(res.adViewsToday);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to load");
+    }
   };
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
@@ -162,11 +160,13 @@ function EditPointsDialog({ row, onDone }: { row: Row; onDone: () => void }) {
 function HistoryDialog({ userId, email }: { userId: string; email: string }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<any[]>([]);
+  const fn = useServerFn(adminUserHistory);
   useEffect(() => {
     if (!open) return;
-    supabase.from("points_transactions").select("*").eq("user_id", userId)
-      .order("created_at", { ascending: false }).limit(100).then(({ data }) => setItems(data ?? []));
-  }, [open, userId]);
+    fn({ data: { targetUserId: userId } })
+      .then((r) => setItems(r.items))
+      .catch(() => setItems([]));
+  }, [open, userId, fn]);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" variant="ghost">History</Button></DialogTrigger>

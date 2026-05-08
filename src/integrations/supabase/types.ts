@@ -160,12 +160,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_adjust_points: {
+        Args: { _delta: number; _reason: string; _target: string }
+        Returns: number
+      }
+      claim_daily_checkin: {
+        Args: { _amount: number; _user_id: string }
+        Returns: {
+          claimed: boolean
+          next_at: string
+          points: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_points: {
+        Args: { _delta: number; _user_id: string }
+        Returns: number
+      }
+      request_withdrawal_atomic: {
+        Args: {
+          _points: number
+          _ton_address: string
+          _ton_amount: number
+          _user_id: string
+        }
+        Returns: {
+          new_points: number
+          ok: boolean
+          reason: string
+        }[]
       }
     }
     Enums: {
