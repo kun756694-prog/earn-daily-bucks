@@ -25,7 +25,7 @@ function HomePage() {
         <section className="mt-12">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
             <h2 className="text-2xl sm:text-3xl font-bold">Ways to earn</h2>
-            <BonusButton onDone={refreshProfile as any} />
+            <BonusButton onClaimed={refreshProfile} />
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
             <CheckinCard profile={profile} onDone={refreshProfile} />
