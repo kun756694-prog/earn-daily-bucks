@@ -127,23 +127,8 @@ function RootComponent() {
           </main>
         </div>
         <Toaster richColors theme="dark" position="top-center" />
-        {/* Monetag ads (zone 10979557) */}
-        <script
-          async
-          data-cfasync="false"
-          src="https://5gvci.com/act/files/tag.min.js?z=10979557"
-        />
-        <script
-          async
-          data-cfasync="false"
-          src="https://quge5.com/88/tag.min.js"
-          data-zone="237352"
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}`,
-          }}
-        />
+        {/* Monetag SDK is loaded on-demand only after login (see BonusButton),
+            never on /, /login, /signup — required by Monetag policy. */}
       </AuthProvider>
     </QueryClientProvider>
   );
