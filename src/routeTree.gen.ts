@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as EarnRouteImport } from './routes/earn'
@@ -16,6 +17,11 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiCpagripPostbackRouteImport } from './routes/api/cpagrip-postback'
 
+const TasksRoute = TasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/earn': typeof EarnRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/tasks': typeof TasksRoute
   '/api/cpagrip-postback': typeof ApiCpagripPostbackRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/earn': typeof EarnRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/tasks': typeof TasksRoute
   '/api/cpagrip-postback': typeof ApiCpagripPostbackRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/earn': typeof EarnRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/tasks': typeof TasksRoute
   '/api/cpagrip-postback': typeof ApiCpagripPostbackRoute
 }
 export interface FileRouteTypes {
@@ -80,9 +89,17 @@ export interface FileRouteTypes {
     | '/earn'
     | '/login'
     | '/signup'
+    | '/tasks'
     | '/api/cpagrip-postback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/earn' | '/login' | '/signup' | '/api/cpagrip-postback'
+  to:
+    | '/'
+    | '/admin'
+    | '/earn'
+    | '/login'
+    | '/signup'
+    | '/tasks'
+    | '/api/cpagrip-postback'
   id:
     | '__root__'
     | '/'
@@ -90,6 +107,7 @@ export interface FileRouteTypes {
     | '/earn'
     | '/login'
     | '/signup'
+    | '/tasks'
     | '/api/cpagrip-postback'
   fileRoutesById: FileRoutesById
 }
@@ -99,11 +117,19 @@ export interface RootRouteChildren {
   EarnRoute: typeof EarnRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  TasksRoute: typeof TasksRoute
   ApiCpagripPostbackRoute: typeof ApiCpagripPostbackRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -155,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   EarnRoute: EarnRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  TasksRoute: TasksRoute,
   ApiCpagripPostbackRoute: ApiCpagripPostbackRoute,
 }
 export const routeTree = rootRouteImport

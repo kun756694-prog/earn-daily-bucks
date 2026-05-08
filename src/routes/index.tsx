@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Play, Target, Users, Copy, Loader2, Sparkles } from "lucide-react";
+import { Calendar, Play, Target, Users, Copy, Loader2, Sparkles, Youtube } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ function HomePage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
             <CheckinCard profile={profile} onDone={refreshProfile} />
             <WatchAdCard onDone={refreshProfile} />
+            <TasksCard />
             <OffersCard />
             <ReferralCard code={profile?.referral_code} />
           </div>
@@ -154,6 +155,19 @@ function OffersCard() {
       <p className="text-sm text-muted-foreground mt-1 mb-4">Earn up to 500 points per offer.</p>
       <Link to="/earn" className="mt-auto">
         <Button variant="outline" className="w-full">Open offer wall</Button>
+      </Link>
+    </Card>
+  );
+}
+
+function TasksCard() {
+  return (
+    <Card>
+      <Youtube className="h-8 w-8 text-primary mb-3" />
+      <h3 className="font-semibold text-lg">Video Tasks</h3>
+      <p className="text-sm text-muted-foreground mt-1 mb-4">Watch ad + video. +20 per task.</p>
+      <Link to="/tasks" className="mt-auto">
+        <Button variant="outline" className="w-full">Open tasks</Button>
       </Link>
     </Card>
   );
