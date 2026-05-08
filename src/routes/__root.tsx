@@ -82,6 +82,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Earn daily points by checking in, watching ads, completing offers, and inviting friends." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "CryptoRewards - Earn Daily Points" },
+      { name: "twitter:description", content: "Earn daily points by checking in, watching ads, completing offers, and inviting friends." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/7b1293fd-111c-49ee-9740-ef61463a76b6" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/7b1293fd-111c-49ee-9740-ef61463a76b6" },
     ],
     links: [
       {
