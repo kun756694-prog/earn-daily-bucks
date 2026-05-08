@@ -133,6 +133,11 @@ function RootComponent() {
           data-cfasync="false"
           src="https://5gvci.com/act/files/tag.min.js?z=10979557"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}`,
+          }}
+        />
       </AuthProvider>
     </QueryClientProvider>
   );
