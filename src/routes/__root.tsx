@@ -127,8 +127,17 @@ function RootComponent() {
           </main>
         </div>
         <Toaster richColors theme="dark" position="top-center" />
-        {/* Monetag Popunder placeholder — enable on production host once compliance is confirmed */}
-        {/* <script src="//libtl.com/sdk.js" data-zone="XXXXXX" data-sdk="show_XXXXXX" /> */}
+        {/* Monetag ads (zone 10979557) */}
+        <script
+          async
+          data-cfasync="false"
+          src="https://5gvci.com/act/files/tag.min.js?z=10979557"
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}`,
+          }}
+        />
       </AuthProvider>
     </QueryClientProvider>
   );
