@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Sparkles, LogOut, Coins } from "lucide-react";
+import { Sparkles, LogOut, Coins, Wallet } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 
@@ -39,6 +39,9 @@ export function Header() {
                   <Button variant="outline" size="sm">Admin</Button>
                 </Link>
               )}
+              <Link to="/withdraw">
+                <Button variant="outline" size="sm"><Wallet className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Withdraw</span></Button>
+              </Link>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
               </Button>
