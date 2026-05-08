@@ -134,6 +134,12 @@ function RootComponent() {
           src="https://5gvci.com/act/files/tag.min.js?z=10979557"
         />
         <script
+          async
+          data-cfasync="false"
+          src="https://quge5.com/88/tag.min.js"
+          data-zone="237352"
+        />
+        <script
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}`,
           }}
