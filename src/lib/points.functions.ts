@@ -64,6 +64,35 @@ export const claimAdReward = createServerFn({ method: "POST" })
     return { ok: true as const, points: newPoints };
   });
 
+export const claimTaskReward = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ taskId: z.string().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const adType = `task_${data.taskId}`;
+
+    // Prevent claiming the same task twice
+    const { data: existing } = await supabase
+      .from("ad_views")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("ad_type", adType)
+      .maybeSingle();
+    if (existing) {
+      return { ok: false as const, reason: "already_claimed" };
+    }
+
+    await supabase.from("ad_views").insert({ user_id: userId, ad_type: adType });
+
+    const { data: prof } = await supabase.from("profiles").select("points").eq("id", userId).maybeSingle();
+    const newPoints = (prof?.points ?? 0) + 20;
+    await supabase.from("profiles").update({ points: newPoints }).eq("id", userId);
+    await supabase.from("points_transactions").insert({
+      user_id: userId, amount: 20, type: "task", reason: `Completed ${data.taskId}`,
+    });
+    return { ok: true as const, points: newPoints };
+  });
+
 export const adminAdjustPoints = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
