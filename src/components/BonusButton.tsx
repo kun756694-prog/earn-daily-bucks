@@ -44,7 +44,11 @@ export function BonusButton({ onClaimed }: { onClaimed?: () => Promise<void> }) 
         await (onClaimed ? onClaimed() : refreshProfile());
       }
     } catch (e: any) {
-      toast.error(e.message ?? "Failed");
+      const msg =
+        e instanceof Response
+          ? `Failed (${e.status})`
+          : (e?.message ?? "Failed");
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
