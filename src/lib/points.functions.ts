@@ -93,6 +93,30 @@ export const claimTaskReward = createServerFn({ method: "POST" })
     return { ok: true as const, points: newPoints };
   });
 
+export const claimBonusReward = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    // Rate limit: 1 bonus click per 30 seconds
+    const since = new Date(Date.now() - 30_000).toISOString();
+    const { count } = await supabase
+      .from("ad_views")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("ad_type", "bonus_click")
+      .gte("created_at", since);
+    if ((count ?? 0) > 0) return { ok: false as const, reason: "rate_limited" };
+
+    await supabase.from("ad_views").insert({ user_id: userId, ad_type: "bonus_click" });
+    const { data: prof } = await supabase.from("profiles").select("points").eq("id", userId).maybeSingle();
+    const newPoints = (prof?.points ?? 0) + 10;
+    await supabase.from("profiles").update({ points: newPoints }).eq("id", userId);
+    await supabase.from("points_transactions").insert({
+      user_id: userId, amount: 10, type: "bonus", reason: "Bonus ad click",
+    });
+    return { ok: true as const, points: newPoints };
+  });
+
 export const adminAdjustPoints = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
