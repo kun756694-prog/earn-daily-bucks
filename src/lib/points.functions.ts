@@ -117,6 +117,52 @@ export const claimBonusReward = createServerFn({ method: "POST" })
     return { ok: true as const, points: newPoints };
   });
 
+const POINTS_PER_TON = 20000;
+const MIN_TON = 15;
+
+export const requestWithdrawal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    tonAmount: z.number().int().min(MIN_TON).max(10000),
+    tonAddress: z.string().min(40).max(80).regex(/^[A-Za-z0-9_-]+$/),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const pointsNeeded = data.tonAmount * POINTS_PER_TON;
+
+    const { data: prof } = await supabase
+      .from("profiles").select("points").eq("id", userId).maybeSingle();
+    if (!prof) throw new Error("Profile not found");
+    if ((prof.points ?? 0) < pointsNeeded) {
+      return { ok: false as const, reason: "insufficient_points" };
+    }
+
+    // Block if there's already a pending withdrawal
+    const { count: pendingCount } = await supabase
+      .from("withdrawals")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "pending");
+    if ((pendingCount ?? 0) > 0) {
+      return { ok: false as const, reason: "pending_exists" };
+    }
+
+    const newPoints = prof.points - pointsNeeded;
+    await supabase.from("profiles").update({ points: newPoints }).eq("id", userId);
+    await supabase.from("withdrawals").insert({
+      user_id: userId,
+      ton_address: data.tonAddress,
+      points_spent: pointsNeeded,
+      ton_amount: data.tonAmount,
+      status: "pending",
+    });
+    await supabase.from("points_transactions").insert({
+      user_id: userId, amount: -pointsNeeded, type: "withdrawal",
+      reason: `Withdrawal request: ${data.tonAmount} TON`,
+    });
+    return { ok: true as const, points: newPoints };
+  });
+
 export const adminAdjustPoints = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
