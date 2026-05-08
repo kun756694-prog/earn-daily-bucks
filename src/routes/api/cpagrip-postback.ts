@@ -16,7 +16,10 @@ export const Route = createFileRoute("/api/cpagrip-postback")({
 async function handle(request: Request) {
   const url = new URL(request.url);
   const passkey = url.searchParams.get("passkey");
-  const expected = process.env.CPAGRIP_POSTBACK_KEY ?? "PLACEHOLDER";
+  const expected = process.env.CPAGRIP_POSTBACK_KEY;
+  if (!expected) {
+    return new Response("Server misconfiguration", { status: 500 });
+  }
   if (!passkey || passkey !== expected) {
     return new Response("Invalid passkey", { status: 401 });
   }
@@ -26,8 +29,16 @@ async function handle(request: Request) {
   const txid = url.searchParams.get("txid") ?? url.searchParams.get("trans_id") ?? "";
   const payout = Number(payoutStr);
 
-  if (!userId || !Number.isFinite(payout) || payout <= 0) {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const MAX_PAYOUT = 50; // USD cap per postback
+  if (!userId || !UUID_RE.test(userId)) {
+    return new Response("Invalid user_id", { status: 400 });
+  }
+  if (!Number.isFinite(payout) || payout <= 0 || payout > MAX_PAYOUT) {
     return new Response("Bad request", { status: 400 });
+  }
+  if (txid.length > 128 || !/^[\w:.\-]*$/.test(txid)) {
+    return new Response("Invalid txid", { status: 400 });
   }
 
   // Idempotency: skip if this txid was already credited
@@ -43,14 +54,11 @@ async function handle(request: Request) {
 
   const points = Math.round(payout * 100); // $1 = 100 pts
 
-  const { data: prof, error: pErr } = await supabaseAdmin
-    .from("profiles").select("points").eq("id", userId).maybeSingle();
-  if (pErr || !prof) return new Response("User not found", { status: 404 });
-
-  await supabaseAdmin
-    .from("profiles")
-    .update({ points: (prof.points ?? 0) + points })
-    .eq("id", userId);
+  const { data: newPoints, error: rpcErr } = await supabaseAdmin
+    .rpc("increment_points", { _user_id: userId, _delta: points });
+  if (rpcErr || newPoints === null) {
+    return new Response("User not found", { status: 404 });
+  }
 
   await supabaseAdmin.from("points_transactions").insert({
     user_id: userId,
