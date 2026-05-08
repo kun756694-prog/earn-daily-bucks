@@ -9,6 +9,9 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { AuthProvider } from "@/lib/auth-context";
+import { Header } from "@/components/Header";
+import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
@@ -72,14 +75,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "CryptoRewards - Earn Daily Points" },
+      { name: "description", content: "Earn daily points by checking in, watching ads, completing offers, and inviting friends." },
+      { name: "monetag", content: "406973b0ffe2475c38d10068b01351d5" },
+      { property: "og:title", content: "CryptoRewards - Earn Daily Points" },
+      { property: "og:description", content: "Earn daily points by checking in, watching ads, completing offers, and inviting friends." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -113,7 +115,17 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1">
+            <Outlet />
+          </main>
+        </div>
+        <Toaster richColors theme="dark" position="top-center" />
+        {/* Monetag Popunder placeholder — enable on production host once compliance is confirmed */}
+        {/* <script src="//libtl.com/sdk.js" data-zone="XXXXXX" data-sdk="show_XXXXXX" /> */}
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
