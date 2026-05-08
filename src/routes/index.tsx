@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Play, Target, Users, Copy, Loader2, Sparkles } from "lucide-react";
+import { Calendar, Play, Target, Users, Copy, Loader2, Sparkles, Youtube } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ function HomePage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
             <CheckinCard profile={profile} onDone={refreshProfile} />
             <WatchAdCard onDone={refreshProfile} />
+            <TasksCard />
             <OffersCard />
             <ReferralCard code={profile?.referral_code} />
           </div>
