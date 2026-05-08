@@ -119,6 +119,42 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawals: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          id: string
+          points_spent: number
+          processed_at: string | null
+          status: string
+          ton_address: string
+          ton_amount: number
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          points_spent: number
+          processed_at?: string | null
+          status?: string
+          ton_address: string
+          ton_amount: number
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          id?: string
+          points_spent?: number
+          processed_at?: string | null
+          status?: string
+          ton_address?: string
+          ton_amount?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

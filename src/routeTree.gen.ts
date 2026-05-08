@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WithdrawRouteImport } from './routes/withdraw'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
@@ -17,6 +18,11 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiCpagripPostbackRouteImport } from './routes/api/cpagrip-postback'
 
+const WithdrawRoute = WithdrawRouteImport.update({
+  id: '/withdraw',
+  path: '/withdraw',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksRoute = TasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/tasks': typeof TasksRoute
+  '/withdraw': typeof WithdrawRoute
   '/api/cpagrip-postback': typeof ApiCpagripPostbackRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/tasks': typeof TasksRoute
+  '/withdraw': typeof WithdrawRoute
   '/api/cpagrip-postback': typeof ApiCpagripPostbackRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/tasks': typeof TasksRoute
+  '/withdraw': typeof WithdrawRoute
   '/api/cpagrip-postback': typeof ApiCpagripPostbackRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/tasks'
+    | '/withdraw'
     | '/api/cpagrip-postback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/tasks'
+    | '/withdraw'
     | '/api/cpagrip-postback'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/tasks'
+    | '/withdraw'
     | '/api/cpagrip-postback'
   fileRoutesById: FileRoutesById
 }
@@ -118,11 +130,19 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   TasksRoute: typeof TasksRoute
+  WithdrawRoute: typeof WithdrawRoute
   ApiCpagripPostbackRoute: typeof ApiCpagripPostbackRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/withdraw': {
+      id: '/withdraw'
+      path: '/withdraw'
+      fullPath: '/withdraw'
+      preLoaderRoute: typeof WithdrawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tasks': {
       id: '/tasks'
       path: '/tasks'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   TasksRoute: TasksRoute,
+  WithdrawRoute: WithdrawRoute,
   ApiCpagripPostbackRoute: ApiCpagripPostbackRoute,
 }
 export const routeTree = rootRouteImport
