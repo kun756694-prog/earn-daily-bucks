@@ -160,6 +160,19 @@ function OffersCard() {
   );
 }
 
+function TasksCard() {
+  return (
+    <Card>
+      <Youtube className="h-8 w-8 text-primary mb-3" />
+      <h3 className="font-semibold text-lg">Video Tasks</h3>
+      <p className="text-sm text-muted-foreground mt-1 mb-4">Watch ad + video. +20 per task.</p>
+      <Link to="/tasks" className="mt-auto">
+        <Button variant="outline" className="w-full">Open tasks</Button>
+      </Link>
+    </Card>
+  );
+}
+
 function ReferralCard({ code }: { code?: string }) {
   const link = typeof window !== "undefined" && code ? `${window.location.origin}/signup?ref=${code}` : "";
   const copy = async () => {
