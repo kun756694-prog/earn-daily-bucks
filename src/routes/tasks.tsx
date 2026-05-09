@@ -17,24 +17,23 @@ export const Route = createFileRoute("/tasks")({
 type Task = {
   id: string;
   title: string;
-  adUrl: string;
-  videoUrl: string;
+  url: string;
 };
 
-const AD_URL = "https://www.profitablecpmratenetwork.com/ph1f2ij5tc?key=7b593523cfc95a14f0eeb3939de91779";
-const VIDEO_URL = "https://youtu.be/Yg4SGKLx9Hs?si=rK_mU8VuS3VXCCe2";
-
 const TASKS: Task[] = [
-  { id: "task1", title: "Task 1", adUrl: AD_URL, videoUrl: VIDEO_URL },
-  { id: "task2", title: "Task 2", adUrl: AD_URL, videoUrl: VIDEO_URL },
-  { id: "task3", title: "Task 3", adUrl: AD_URL, videoUrl: VIDEO_URL },
-  { id: "task4", title: "Task 4", adUrl: AD_URL, videoUrl: VIDEO_URL },
+  { id: "task1", title: "Task 1", url: "https://www.profitablecpmratenetwork.com/ph1f2ij5tc?key=7b593523cfc95a14f0eeb3939de91779" },
+  { id: "task2", title: "Task 2", url: "https://www.profitablecpmratenetwork.com/jjinsj1h2v?key=15e360c0e974dce88867b96383c9c1f5" },
+  { id: "task3", title: "Task 3", url: "https://www.profitablecpmratenetwork.com/ziadeax47?key=280244817897c83ce7c6542678cc971d" },
+  { id: "task4", title: "Task 4", url: "https://omg10.com/4/10958497" },
+  { id: "task5", title: "Task 5", url: "https://omg10.com/4/10958858" },
+  { id: "task6", title: "Task 6", url: "https://omg10.com/4/10984329" },
+  { id: "task7", title: "Task 7", url: "https://omg10.com/4/10970856" },
 ];
 
 function TasksPage() {
   const { user, profile, loading, refreshProfile } = useAuth();
   const nav = useNavigate();
-  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [lastClaim, setLastClaim] = useState<Map<string, number>>(new Map());
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [loading, user, nav]);
 
@@ -43,10 +42,18 @@ function TasksPage() {
     (async () => {
       const { data } = await supabase
         .from("ad_views")
-        .select("ad_type")
+        .select("ad_type, created_at")
         .eq("user_id", user.id)
         .like("ad_type", "task_%");
-      if (data) setCompleted(new Set(data.map((r) => r.ad_type.replace("task_", ""))));
+      if (data) {
+        const m = new Map<string, number>();
+        for (const r of data) {
+          const id = r.ad_type.replace("task_", "");
+          const t = new Date(r.created_at).getTime();
+          if (!m.has(id) || (m.get(id) ?? 0) < t) m.set(id, t);
+        }
+        setLastClaim(m);
+      }
     })();
   }, [user]);
 
@@ -57,7 +64,7 @@ function TasksPage() {
       <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold neon-text">Video Tasks</h1>
-          <p className="text-muted-foreground text-sm mt-1">Watch a 15-second ad, then watch the video to earn 20 points.</p>
+          <p className="text-muted-foreground text-sm mt-1">Open each task, wait 30 seconds, then claim 10 points. Each task can be claimed every 30 minutes.</p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 rounded-full glass">
           <Coins className="h-5 w-5 text-primary" />
@@ -76,9 +83,9 @@ function TasksPage() {
           >
             <TaskCard
               task={t}
-              done={completed.has(t.id)}
+              lastClaimAt={lastClaim.get(t.id) ?? 0}
               onClaimed={async () => {
-                setCompleted((s) => new Set(s).add(t.id));
+                setLastClaim((m) => new Map(m).set(t.id, Date.now()));
                 await refreshProfile();
               }}
             />
@@ -89,18 +96,37 @@ function TasksPage() {
   );
 }
 
-type Phase = "idle" | "ad_opened" | "watching" | "ready" | "claiming" | "done";
+type Phase = "idle" | "watching" | "ready" | "claiming" | "cooldown";
 
 const WAIT_SECONDS = 30;
+const COOLDOWN_MS = 30 * 60 * 1000;
 
-function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClaimed: () => Promise<void> }) {
+function TaskCard({ task, lastClaimAt, onClaimed }: { task: Task; lastClaimAt: number; onClaimed: () => Promise<void> }) {
   const claim = useServerFn(claimTaskReward);
   const begin = useServerFn(startTask);
-  const [phase, setPhase] = useState<Phase>(done ? "done" : "idle");
+  const inCooldown = () => Date.now() - lastClaimAt < COOLDOWN_MS;
+  const [phase, setPhase] = useState<Phase>(inCooldown() ? "cooldown" : "idle");
   const [remaining, setRemaining] = useState(WAIT_SECONDS);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
 
-  useEffect(() => { if (done) setPhase("done"); }, [done]);
+  useEffect(() => {
+    if (inCooldown()) setPhase("cooldown");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastClaimAt]);
+
+  // Cooldown countdown
+  useEffect(() => {
+    if (phase !== "cooldown") return;
+    const tick = () => {
+      const left = Math.max(0, COOLDOWN_MS - (Date.now() - lastClaimAt));
+      setCooldownLeft(left);
+      if (left === 0) setPhase("idle");
+    };
+    tick();
+    const i = setInterval(tick, 1000);
+    return () => clearInterval(i);
+  }, [phase, lastClaimAt]);
 
   // Background timer + window focus check: when 30s elapsed since open, enable claim.
   useEffect(() => {
@@ -122,19 +148,14 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
     };
   }, [phase, startedAt]);
 
-  const openAd = () => {
-    window.open(task.adUrl, "_blank", "noopener,noreferrer");
-    setPhase("ad_opened");
-  };
-
-  const openVideo = async () => {
+  const openTask = async () => {
     try {
       await begin({ data: { taskId: task.id } });
     } catch {
       toast.error("Could not start task. Please try again.");
       return;
     }
-    window.open(task.videoUrl, "_blank", "noopener,noreferrer");
+    window.open(task.url, "_blank", "noopener,noreferrer");
     setStartedAt(Date.now());
     setRemaining(WAIT_SECONDS);
     setPhase("watching");
@@ -147,16 +168,23 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
       if (!res.ok) {
         if (res.reason === "too_soon") toast.error("Please wait 30 seconds first");
         else if (res.reason === "not_started") toast.error("Start the task first");
-        else if (res.reason === "already_claimed") toast.error("Already claimed");
+        else if (res.reason === "cooldown") toast.error("Already claimed — try again in 30 minutes");
         else toast.error("Could not claim reward");
         setPhase("ready");
         return;
-      } else { toast.success(`${task.title} complete +20 points`); await onClaimed(); }
-      setPhase("done");
+      } else { toast.success(`${task.title} complete +10 points`); await onClaimed(); }
+      setPhase("cooldown");
     } catch {
       toast.error("Failed to claim");
       setPhase("ready");
     }
+  };
+
+  const fmtCooldown = (ms: number) => {
+    const s = Math.ceil(ms / 1000);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}m ${r}s`;
   };
 
   return (
@@ -165,26 +193,20 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
         <div className="flex items-center gap-2">
           <Youtube className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-lg">{task.title}</h3>
-          {phase === "done" && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
+          {phase === "cooldown" && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          {phase === "idle" && "Step 1: Watch a quick ad to unlock the video."}
-          {phase === "ad_opened" && "Step 2: Now open the YouTube video."}
+          {phase === "idle" && "Open the link, wait 30 seconds, then claim 10 points."}
           {phase === "watching" && `Watching… come back in ${remaining}s to claim`}
           {phase === "ready" && "You're back! Claim your reward."}
           {phase === "claiming" && "Crediting your points…"}
-          {phase === "done" && "Reward claimed (+20 points)."}
+          {phase === "cooldown" && `Claimed (+10 points). Available again in ${fmtCooldown(cooldownLeft)}.`}
         </p>
       </div>
       <div className="flex items-center gap-2">
         {phase === "idle" && (
-          <Button onClick={openAd}>
-            <ExternalLink className="h-4 w-4 mr-1" /> Watch Task
-          </Button>
-        )}
-        {phase === "ad_opened" && (
-          <Button onClick={openVideo} variant="secondary">
-            <Youtube className="h-4 w-4 mr-1" /> Go to YouTube
+          <Button onClick={openTask}>
+            <ExternalLink className="h-4 w-4 mr-1" /> Open Task
           </Button>
         )}
         {phase === "watching" && (
@@ -194,15 +216,15 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
         )}
         {phase === "ready" && (
           <Button onClick={claimReward} variant="secondary">
-            <Youtube className="h-4 w-4 mr-1" /> Claim +20
+            <Youtube className="h-4 w-4 mr-1" /> Claim +10
           </Button>
         )}
         {phase === "claiming" && (
           <Button disabled><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Claiming…</Button>
         )}
-        {phase === "done" && (
+        {phase === "cooldown" && (
           <Button disabled variant="outline">
-            <CheckCircle2 className="h-4 w-4 mr-1" /> Done
+            <CheckCircle2 className="h-4 w-4 mr-1" /> {fmtCooldown(cooldownLeft)}
           </Button>
         )}
       </div>
