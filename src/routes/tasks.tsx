@@ -21,31 +21,14 @@ type Task = {
   videoUrl: string;
 };
 
+const AD_URL = "https://www.profitablecpmratenetwork.com/ph1f2ij5tc?key=7b593523cfc95a14f0eeb3939de91779";
+const VIDEO_URL = "https://youtu.be/Yg4SGKLx9Hs?si=rK_mU8VuS3VXCCe2";
+
 const TASKS: Task[] = [
-  {
-    id: "task1",
-    title: "Task 1",
-    adUrl: "https://omg10.com/4/10958497",
-    videoUrl: "https://youtu.be/7mJcDu1H0h4?si=slZNMRzYVfvGp0iu",
-  },
-  {
-    id: "task2",
-    title: "Task 2",
-    adUrl: "https://omg10.com/4/10958858",
-    videoUrl: "https://youtu.be/_2oFJlCrMZU?si=sYMTEyCbqAhgszpP",
-  },
-  {
-    id: "task3",
-    title: "Task 3",
-    adUrl: "https://omg10.com/4/10970856",
-    videoUrl: "https://youtu.be/diR0AnDaBlM?si=A8eq40NHi52g1Am5",
-  },
-  {
-    id: "task4",
-    title: "Task 4",
-    adUrl: "https://www.profitablecpmratenetwork.com/jjinsj1h2v?key=15e360c0e974dce88867b96383c9c1f5",
-    videoUrl: "https://youtu.be/dQw4w9WgXcQ",
-  },
+  { id: "task1", title: "Task 1", adUrl: AD_URL, videoUrl: VIDEO_URL },
+  { id: "task2", title: "Task 2", adUrl: AD_URL, videoUrl: VIDEO_URL },
+  { id: "task3", title: "Task 3", adUrl: AD_URL, videoUrl: VIDEO_URL },
+  { id: "task4", title: "Task 4", adUrl: AD_URL, videoUrl: VIDEO_URL },
 ];
 
 function TasksPage() {
@@ -106,7 +89,7 @@ function TasksPage() {
   );
 }
 
-type Phase = "idle" | "watching" | "ready" | "claiming" | "done";
+type Phase = "idle" | "ad_opened" | "watching" | "ready" | "claiming" | "done";
 
 const WAIT_SECONDS = 30;
 
@@ -139,7 +122,12 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
     };
   }, [phase, startedAt]);
 
-  const openTask = async () => {
+  const openAd = () => {
+    window.open(task.adUrl, "_blank", "noopener,noreferrer");
+    setPhase("ad_opened");
+  };
+
+  const openVideo = async () => {
     try {
       await begin({ data: { taskId: task.id } });
     } catch {
@@ -180,7 +168,8 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
           {phase === "done" && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          {phase === "idle" && "Open the task and watch for 30 seconds, then claim your reward."}
+          {phase === "idle" && "Step 1: Watch a quick ad to unlock the video."}
+          {phase === "ad_opened" && "Step 2: Now open the YouTube video."}
           {phase === "watching" && `Watching… come back in ${remaining}s to claim`}
           {phase === "ready" && "You're back! Claim your reward."}
           {phase === "claiming" && "Crediting your points…"}
@@ -189,8 +178,13 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
       </div>
       <div className="flex items-center gap-2">
         {phase === "idle" && (
-          <Button onClick={openTask}>
-            <ExternalLink className="h-4 w-4 mr-1" /> Open Task
+          <Button onClick={openAd}>
+            <ExternalLink className="h-4 w-4 mr-1" /> Watch Task
+          </Button>
+        )}
+        {phase === "ad_opened" && (
+          <Button onClick={openVideo} variant="secondary">
+            <Youtube className="h-4 w-4 mr-1" /> Go to YouTube
           </Button>
         )}
         {phase === "watching" && (
