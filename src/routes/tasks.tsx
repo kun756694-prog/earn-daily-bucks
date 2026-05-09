@@ -106,54 +106,68 @@ function TasksPage() {
   );
 }
 
-type Phase = "idle" | "ad" | "video" | "claiming" | "done";
+type Phase = "idle" | "watching" | "ready" | "claiming" | "done";
+
+const WAIT_SECONDS = 30;
 
 function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClaimed: () => Promise<void> }) {
   const claim = useServerFn(claimTaskReward);
   const begin = useServerFn(startTask);
   const [phase, setPhase] = useState<Phase>(done ? "done" : "idle");
-  const [seconds, setSeconds] = useState(15);
+  const [remaining, setRemaining] = useState(WAIT_SECONDS);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
 
   useEffect(() => { if (done) setPhase("done"); }, [done]);
 
+  // Background timer + window focus check: when 30s elapsed since open, enable claim.
   useEffect(() => {
-    if (phase !== "ad") return;
-    setSeconds(15);
-    const i = setInterval(() => {
-      setSeconds((s) => {
-        if (s <= 1) { clearInterval(i); setPhase("video"); return 0; }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(i);
-  }, [phase]);
+    if (phase !== "watching" || startedAt == null) return;
+    const tick = () => {
+      const left = Math.max(0, WAIT_SECONDS - Math.floor((Date.now() - startedAt) / 1000));
+      setRemaining(left);
+      if (left === 0) setPhase("ready");
+    };
+    tick();
+    const i = setInterval(tick, 500);
+    const onFocus = () => tick();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      clearInterval(i);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [phase, startedAt]);
 
-  const start = async () => {
+  const openTask = async () => {
     try {
       await begin({ data: { taskId: task.id } });
     } catch {
       toast.error("Could not start task. Please try again.");
       return;
     }
-    window.open(task.adUrl, "_blank", "noopener,noreferrer");
-    setPhase("ad");
+    window.open(task.videoUrl, "_blank", "noopener,noreferrer");
+    setStartedAt(Date.now());
+    setRemaining(WAIT_SECONDS);
+    setPhase("watching");
   };
 
-  const watchVideoAndClaim = async () => {
-    window.open(task.videoUrl, "_blank", "noopener,noreferrer");
+  const claimReward = async () => {
     setPhase("claiming");
     try {
       const res = await claim({ data: { taskId: task.id } });
       if (!res.ok) {
-        if (res.reason === "too_soon") toast.error("Please wait 15 seconds first");
+        if (res.reason === "too_soon") toast.error("Please wait 30 seconds first");
         else if (res.reason === "not_started") toast.error("Start the task first");
         else if (res.reason === "already_claimed") toast.error("Already claimed");
         else toast.error("Could not claim reward");
+        setPhase("ready");
+        return;
       } else { toast.success(`${task.title} complete +20 points`); await onClaimed(); }
       setPhase("done");
     } catch {
       toast.error("Failed to claim");
-      setPhase("video");
+      setPhase("ready");
     }
   };
 
@@ -166,27 +180,27 @@ function TaskCard({ task, done, onClaimed }: { task: Task; done: boolean; onClai
           {phase === "done" && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          {phase === "idle" && "Open the ad, wait 15 seconds, then watch the video."}
-          {phase === "ad" && `Watching ad… ${seconds}s remaining`}
-          {phase === "video" && "Now watch the YouTube video to claim your reward."}
+          {phase === "idle" && "Open the task and watch for 30 seconds, then claim your reward."}
+          {phase === "watching" && `Watching… come back in ${remaining}s to claim`}
+          {phase === "ready" && "You're back! Claim your reward."}
           {phase === "claiming" && "Crediting your points…"}
           {phase === "done" && "Reward claimed (+20 points)."}
         </p>
       </div>
       <div className="flex items-center gap-2">
         {phase === "idle" && (
-          <Button onClick={start}>
-            <ExternalLink className="h-4 w-4 mr-1" /> Start
+          <Button onClick={openTask}>
+            <ExternalLink className="h-4 w-4 mr-1" /> Open Task
           </Button>
         )}
-        {phase === "ad" && (
+        {phase === "watching" && (
           <Button disabled>
-            <Loader2 className="h-4 w-4 mr-1 animate-spin" /> {seconds}s
+            <Loader2 className="h-4 w-4 mr-1 animate-spin" /> {remaining}s
           </Button>
         )}
-        {phase === "video" && (
-          <Button onClick={watchVideoAndClaim} variant="secondary">
-            <Youtube className="h-4 w-4 mr-1" /> Watch & claim +20
+        {phase === "ready" && (
+          <Button onClick={claimReward} variant="secondary">
+            <Youtube className="h-4 w-4 mr-1" /> Claim +20
           </Button>
         )}
         {phase === "claiming" && (
