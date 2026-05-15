@@ -6,13 +6,24 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
-import { dailyCheckin, claimAdReward } from "@/lib/points.functions";
+import { dailyCheckin, claimAdReward, startTask } from "@/lib/points.functions";
 import { toast } from "sonner";
 import { BonusButton } from "@/components/BonusButton";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
 });
+
+const LINKS = {
+  checkin: "https://omg10.com/4/10958497",
+  watchAd: "https://omg10.com/4/10958858",
+  offers: "https://omg10.com/4/10984329",
+  tasks: "https://omg10.com/4/10970856",
+};
+
+function openExternal(url: string) {
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
 function HomePage() {
   const { user, profile, refreshProfile, loading } = useAuth();
@@ -101,6 +112,7 @@ function CheckinCard({ profile, onDone }: { profile: any; onDone: () => Promise<
   const claim = async () => {
     setBusy(true);
     try {
+      openExternal(LINKS.checkin);
       const res = await fn();
       if (!res.ok) toast.error("Already claimed today");
       else { toast.success("Check-in success +10 points"); await onDone(); }
@@ -128,9 +140,8 @@ function WatchAdCard({ onDone }: { onDone: () => Promise<void> }) {
   const watch = async () => {
     setBusy(true);
     try {
-      // Monetag Rewarded Interstitial integration goes here on production host:
-      // await window.show_XXXXXX();
-      await new Promise((r) => setTimeout(r, 1500)); // placeholder ad playback
+      openExternal(LINKS.watchAd);
+      await new Promise((r) => setTimeout(r, 1500));
       const res = await fn({ data: { adType: "rewarded_interstitial" } });
       if (!res.ok) toast.error("Wait a moment before watching another ad");
       else { toast.success("Ad completed +20 points"); await onDone(); }
@@ -152,27 +163,35 @@ function WatchAdCard({ onDone }: { onDone: () => Promise<void> }) {
 }
 
 function OffersCard() {
+  const track = useServerFn(startTask);
+  const open = async () => {
+    openExternal(LINKS.offers);
+    try { await track({ data: { taskId: "card_offers" } }); } catch {}
+    toast.success("Offer opened — complete it to earn points");
+  };
   return (
     <Card>
       <Target className="h-8 w-8 text-primary mb-3" />
       <h3 className="font-semibold text-lg">Complete Offers</h3>
       <p className="text-sm text-muted-foreground mt-1 mb-4">Earn up to 500 points per offer.</p>
-      <Link to="/earn" className="mt-auto">
-        <Button variant="outline" className="w-full">Open offer wall</Button>
-      </Link>
+      <Button variant="outline" className="w-full mt-auto" onClick={open}>Open offer wall</Button>
     </Card>
   );
 }
 
 function TasksCard() {
+  const track = useServerFn(startTask);
+  const open = async () => {
+    openExternal(LINKS.tasks);
+    try { await track({ data: { taskId: "card_tasks" } }); } catch {}
+    toast.success("Task opened — complete it to earn points");
+  };
   return (
     <Card>
       <Youtube className="h-8 w-8 text-primary mb-3" />
       <h3 className="font-semibold text-lg">Video Tasks</h3>
       <p className="text-sm text-muted-foreground mt-1 mb-4">Watch ad + video. +20 per task.</p>
-      <Link to="/tasks" className="mt-auto">
-        <Button variant="outline" className="w-full">Open tasks</Button>
-      </Link>
+      <Button variant="outline" className="w-full mt-auto" onClick={open}>Open tasks</Button>
     </Card>
   );
 }
