@@ -142,10 +142,12 @@ export type Database = {
           admin_note: string | null
           created_at: string
           id: string
+          method: string
+          payout_details: string | null
           points_spent: number
           processed_at: string | null
           status: string
-          ton_address: string
+          ton_address: string | null
           ton_amount: number
           user_id: string
         }
@@ -153,10 +155,12 @@ export type Database = {
           admin_note?: string | null
           created_at?: string
           id?: string
+          method?: string
+          payout_details?: string | null
           points_spent: number
           processed_at?: string | null
           status?: string
-          ton_address: string
+          ton_address?: string | null
           ton_amount: number
           user_id: string
         }
@@ -164,10 +168,12 @@ export type Database = {
           admin_note?: string | null
           created_at?: string
           id?: string
+          method?: string
+          payout_details?: string | null
           points_spent?: number
           processed_at?: string | null
           status?: string
-          ton_address?: string
+          ton_address?: string | null
           ton_amount?: number
           user_id?: string
         }
@@ -230,6 +236,19 @@ export type Database = {
           _points: number
           _ton_address: string
           _ton_amount: number
+          _user_id: string
+        }
+        Returns: {
+          new_points: number
+          ok: boolean
+          reason: string
+        }[]
+      }
+      request_withdrawal_v2: {
+        Args: {
+          _amount_units: number
+          _method: string
+          _payout_details: string
           _user_id: string
         }
         Returns: {
