@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Coins, Loader2, Wallet, Download, ExternalLink } from "lucide-react";
+import { Coins, Loader2, Smartphone, Wallet, CreditCard, Banknote, Gem } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { requestWithdrawal } from "@/lib/points.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,15 +12,35 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/withdraw")({
   component: WithdrawPage,
-  head: () => ({ meta: [{ title: "Withdraw TON — CryptoRewards" }] }),
+  head: () => ({ meta: [{ title: "Withdraw — CryptoRewards" }] }),
 });
 
-const POINTS_PER_TON = 20000;
-const MIN_TON = 15;
+const POINTS_PER_UNIT = 10000;
+const MIN_POINTS = 10000;
+
+type MethodId = "wave" | "kbzpay" | "tng" | "duitnow" | "ton";
+
+const METHODS: {
+  id: MethodId;
+  name: string;
+  unit: string;
+  detailsLabel: string;
+  detailsPlaceholder: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+}[] = [
+  { id: "wave",    name: "Wave Money", unit: "MMK eq.", detailsLabel: "Phone Number",   detailsPlaceholder: "09xxxxxxxxx",  icon: Smartphone, accent: "from-sky-500/30 to-blue-500/10" },
+  { id: "kbzpay",  name: "KBZPay",     unit: "MMK eq.", detailsLabel: "Phone Number",   detailsPlaceholder: "09xxxxxxxxx",  icon: Banknote,   accent: "from-amber-500/30 to-orange-500/10" },
+  { id: "tng",     name: "Touch 'n Go",unit: "MYR eq.", detailsLabel: "Phone Number",   detailsPlaceholder: "01xxxxxxxx",   icon: CreditCard, accent: "from-rose-500/30 to-pink-500/10" },
+  { id: "duitnow", name: "DuitNow",    unit: "MYR eq.", detailsLabel: "Account / ID",   detailsPlaceholder: "Account ID or NRIC", icon: Wallet, accent: "from-emerald-500/30 to-green-500/10" },
+  { id: "ton",     name: "TON",        unit: "TON",     detailsLabel: "Wallet Address", detailsPlaceholder: "UQ... or EQ...", icon: Gem,    accent: "from-primary/40 to-purple-500/10" },
+];
 
 type Row = {
   id: string;
-  ton_address: string;
+  method: string | null;
+  payout_details: string | null;
+  ton_address: string | null;
   ton_amount: number;
   points_spent: number;
   status: string;
@@ -32,8 +52,9 @@ function WithdrawPage() {
   const nav = useNavigate();
   const fn = useServerFn(requestWithdrawal);
 
-  const [amount, setAmount] = useState<number>(MIN_TON);
-  const [address, setAddress] = useState("");
+  const [method, setMethod] = useState<MethodId>("wave");
+  const [units, setUnits] = useState<number>(1);
+  const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<Row[]>([]);
 
@@ -44,44 +65,55 @@ function WithdrawPage() {
     const { data } = await supabase
       .from("withdrawals").select("*")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(20);
-    if (data) setHistory(data as Row[]);
+    if (data) setHistory(data as unknown as Row[]);
   };
   useEffect(() => { loadHistory(); }, [user]);
+
+  const active = useMemo(() => METHODS.find((m) => m.id === method)!, [method]);
 
   if (!user) return null;
 
   const points = profile?.points ?? 0;
-  const maxTon = Math.floor(points / POINTS_PER_TON);
-  const cost = amount * POINTS_PER_TON;
+  const maxUnits = Math.floor(points / POINTS_PER_UNIT);
+  const cost = units * POINTS_PER_UNIT;
+  const belowMin = points < MIN_POINTS;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (amount < MIN_TON) { toast.error(`Minimum ${MIN_TON} TON`); return; }
-    if (!address.trim()) { toast.error("Enter your TON wallet address"); return; }
+    if (belowMin) { toast.error(`You need at least ${MIN_POINTS.toLocaleString()} points`); return; }
+    if (units < 1) { toast.error("Minimum withdrawal is 1 unit"); return; }
     if (cost > points) { toast.error("Not enough points"); return; }
+    if (!details.trim()) { toast.error(`Enter your ${active.detailsLabel.toLowerCase()}`); return; }
     setBusy(true);
     try {
-      const res = await fn({ data: { tonAmount: amount, tonAddress: address.trim() } });
+      const res = await fn({ data: { method, payoutDetails: details.trim(), amountUnits: units } });
       if (!res.ok) {
-        toast.error(res.reason === "pending_exists" ? "You already have a pending withdrawal" : "Not enough points");
+        const map: Record<string, string> = {
+          pending_exists: "You already have a pending withdrawal",
+          insufficient_points: "Not enough points",
+          invalid_details: `Invalid ${active.detailsLabel.toLowerCase()}`,
+          invalid_amount: "Invalid amount",
+          invalid_method: "Invalid method",
+        };
+        toast.error(map[res.reason] ?? "Could not submit request");
       } else {
-        toast.success("Withdrawal request submitted");
-        setAddress("");
+        toast.success("Withdrawal request submitted — Pending review");
+        setDetails("");
         await refreshProfile();
         await loadHistory();
       }
     } catch (err: any) {
-      toast.error(err instanceof Response ? `Failed (${err.status})` : err?.message ?? "Failed");
+      toast.error(err?.message ?? "Failed");
     } finally { setBusy(false); }
   };
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-2xl">
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
         <div>
-          <h1 className="text-3xl font-bold neon-text">Withdraw TON</h1>
+          <h1 className="text-3xl font-bold neon-text">Cash Out</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {POINTS_PER_TON.toLocaleString()} points = 1 TON · Minimum {MIN_TON} TON
+            {POINTS_PER_UNIT.toLocaleString()} points = 1 {active.unit} · Minimum {MIN_POINTS.toLocaleString()} points
           </p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 rounded-full glass">
@@ -91,53 +123,63 @@ function WithdrawPage() {
         </div>
       </div>
 
-      <div className="glass rounded-2xl p-5 mb-5">
-        <div className="flex items-start gap-3">
-          <Wallet className="h-6 w-6 text-primary mt-1" />
-          <div className="flex-1">
-            <h3 className="font-semibold">Need a TON wallet?</h3>
-            <p className="text-sm text-muted-foreground mt-1 mb-3">
-              Download Tonkeeper to receive your TON.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <a href="https://tonkeeper.com/download" target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" /> Tonkeeper</Button>
-              </a>
-              <a href="https://play.google.com/store/apps/details?id=com.ton_keeper" target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="ghost"><ExternalLink className="h-4 w-4 mr-1" /> Play Store</Button>
-              </a>
-              <a href="https://apps.apple.com/app/tonkeeper/id1587742107" target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="ghost"><ExternalLink className="h-4 w-4 mr-1" /> App Store</Button>
-              </a>
-            </div>
-          </div>
+      {belowMin && (
+        <div className="glass rounded-xl p-3 mt-4 text-sm text-muted-foreground">
+          Earn at least {MIN_POINTS.toLocaleString()} points to unlock withdrawals.
+        </div>
+      )}
+
+      <div className="mt-6">
+        <Label className="mb-2 block">Choose a method</Label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {METHODS.map((m) => {
+            const Icon = m.icon;
+            const isActive = m.id === method;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setMethod(m.id)}
+                className={`relative text-left rounded-2xl p-4 border transition-all overflow-hidden ${
+                  isActive ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40"
+                }`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${m.accent} opacity-60`} />
+                <div className="relative">
+                  <Icon className="h-6 w-6 mb-2 text-foreground" />
+                  <div className="font-semibold text-sm">{m.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{m.unit}</div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <form onSubmit={submit} className="glass rounded-2xl p-5 space-y-4">
+      <form onSubmit={submit} className="glass rounded-2xl p-5 space-y-4 mt-6">
         <div>
-          <Label htmlFor="amount">Amount (TON)</Label>
+          <Label htmlFor="amount">Amount ({active.unit})</Label>
           <Input
-            id="amount" type="number" min={MIN_TON} max={maxTon || MIN_TON}
-            value={amount} onChange={(e) => setAmount(parseInt(e.target.value || "0", 10))}
+            id="amount" type="number" min={1} max={Math.max(maxUnits, 1)}
+            value={units} onChange={(e) => setUnits(parseInt(e.target.value || "0", 10))}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Costs {cost.toLocaleString()} points · You have {points.toLocaleString()} (max {maxTon} TON)
+            Costs {cost.toLocaleString()} points · Max {maxUnits} {active.unit}
           </p>
         </div>
         <div>
-          <Label htmlFor="addr">TON Wallet Address</Label>
+          <Label htmlFor="details">{active.detailsLabel}</Label>
           <Input
-            id="addr" placeholder="UQ... or EQ..."
-            value={address} onChange={(e) => setAddress(e.target.value)}
+            id="details" placeholder={active.detailsPlaceholder}
+            value={details} onChange={(e) => setDetails(e.target.value)}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Paste your Tonkeeper receive address. Double-check before submitting.
+            Double-check before submitting — payouts can't be reversed.
           </p>
         </div>
-        <Button type="submit" disabled={busy || amount < MIN_TON || cost > points} className="w-full neon-glow">
+        <Button type="submit" disabled={busy || belowMin || cost > points} className="w-full neon-glow">
           {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Request {amount} TON
+          Request Withdrawal
         </Button>
       </form>
 
@@ -147,20 +189,23 @@ function WithdrawPage() {
           <p className="text-sm text-muted-foreground">No withdrawals yet.</p>
         ) : (
           <div className="space-y-2">
-            {history.map((w) => (
-              <div key={w.id} className="glass rounded-xl p-4 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-semibold">{Number(w.ton_amount)} TON</div>
-                  <div className="text-xs text-muted-foreground truncate">{w.ton_address}</div>
-                  <div className="text-xs text-muted-foreground">{new Date(w.created_at).toLocaleString()}</div>
+            {history.map((w) => {
+              const m = METHODS.find((x) => x.id === w.method) ?? METHODS[METHODS.length - 1];
+              return (
+                <div key={w.id} className="glass rounded-xl p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold">{Number(w.ton_amount)} {m.unit} <span className="text-xs text-muted-foreground">· {m.name}</span></div>
+                    <div className="text-xs text-muted-foreground truncate">{w.payout_details ?? w.ton_address}</div>
+                    <div className="text-xs text-muted-foreground">{new Date(w.created_at).toLocaleString()}</div>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    w.status === "paid" ? "bg-emerald-500/20 text-emerald-300"
+                    : w.status === "rejected" ? "bg-red-500/20 text-red-300"
+                    : "bg-yellow-500/20 text-yellow-300"
+                  }`}>{w.status}</span>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  w.status === "paid" ? "bg-emerald-500/20 text-emerald-300"
-                  : w.status === "rejected" ? "bg-red-500/20 text-red-300"
-                  : "bg-yellow-500/20 text-yellow-300"
-                }`}>{w.status}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
