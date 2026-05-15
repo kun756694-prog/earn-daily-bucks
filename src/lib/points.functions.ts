@@ -77,23 +77,25 @@ export const claimBonusReward = createServerFn({ method: "POST" })
     return { ok: true as const, points: row.points };
   });
 
-const POINTS_PER_TON = 20000;
-const MIN_TON = 15;
+export const POINTS_PER_UNIT = 10000;
+export const MIN_UNITS = 1;
+
+const WithdrawMethod = z.enum(["wave", "kbzpay", "tng", "duitnow", "ton"]);
 
 export const requestWithdrawal = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
-    tonAmount: z.number().int().min(MIN_TON).max(10000),
-    tonAddress: z.string().min(40).max(80).regex(/^[A-Za-z0-9_-]+$/),
+    method: WithdrawMethod,
+    payoutDetails: z.string().trim().min(5).max(80),
+    amountUnits: z.number().min(MIN_UNITS).max(100000),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const pointsNeeded = data.tonAmount * POINTS_PER_TON;
-    const { data: rpc, error } = await supabase.rpc("request_withdrawal_atomic", {
+    const { data: rpc, error } = await supabase.rpc("request_withdrawal_v2", {
       _user_id: userId,
-      _ton_amount: data.tonAmount,
-      _points: pointsNeeded,
-      _ton_address: data.tonAddress,
+      _method: data.method,
+      _payout_details: data.payoutDetails,
+      _amount_units: data.amountUnits,
     });
     if (error) safeError(error);
     const row = Array.isArray(rpc) ? rpc[0] : rpc;
