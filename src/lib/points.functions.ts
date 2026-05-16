@@ -170,7 +170,7 @@ export const adminListWithdrawals = createServerFn({ method: "POST" })
     let emailById: Record<string, string> = {};
     if (ids.length) {
       const { data: profs } = await supabase.from("profiles").select("id,email").in("id", ids);
-      emailById = Object.fromEntries((profs ?? []).map((p) => [p.id, p.email]));
+      emailById = Object.fromEntries((profs ?? []).map((p) => [p.id, p.email ?? "—"]));
     }
     return { items: (ws ?? []).map((w) => ({ ...w, email: emailById[w.user_id] ?? "—" })) };
   });
