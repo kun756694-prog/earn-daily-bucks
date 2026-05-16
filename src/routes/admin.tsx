@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
-import { adminAdjustPoints, adminLoad, adminUserHistory } from "@/lib/points.functions";
+import { adminAdjustPoints, adminLoad, adminUserHistory, adminListWithdrawals, adminProcessWithdrawal } from "@/lib/points.functions";
 import { toast } from "sonner";
 import { Users, Coins, TrendingUp, Loader2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/admin")({
   component: AdminPage,
@@ -67,7 +69,13 @@ function AdminPage() {
         <Stat icon={<TrendingUp className="h-5 w-5" />} label="Today ad revenue est." value={`$${totals.revenue}`} />
       </div>
 
-      <div className="glass rounded-2xl p-4 sm:p-6">
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users">
+        <div className="glass rounded-2xl p-4 sm:p-6">
         <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
           <h2 className="text-xl font-semibold">Users</h2>
           <Input
@@ -107,6 +115,100 @@ function AdminPage() {
             </tbody>
           </table>
         </div>
+        </div>
+        </TabsContent>
+        <TabsContent value="withdrawals">
+          <WithdrawalsAdmin />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+type Withdrawal = {
+  id: string; user_id: string; email: string;
+  method: string; payout_details: string | null;
+  points_spent: number; ton_amount: number;
+  status: string; admin_note: string | null;
+  created_at: string; processed_at: string | null;
+};
+
+function WithdrawalsAdmin() {
+  const listFn = useServerFn(adminListWithdrawals);
+  const processFn = useServerFn(adminProcessWithdrawal);
+  const [items, setItems] = useState<Withdrawal[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      const res = await listFn();
+      setItems(res.items as Withdrawal[]);
+    } catch (e: any) { toast.error(e?.message ?? "Failed to load"); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const act = async (id: string, action: "approve" | "reject") => {
+    setBusyId(id);
+    try {
+      const res = await processFn({ data: { withdrawalId: id, action } });
+      if (!res.ok) toast.error(res.reason ?? "Failed");
+      else toast.success(action === "approve" ? "Marked as success" : "Rejected and refunded");
+      await load();
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusyId(null); }
+  };
+
+  const statusVariant = (s: string) =>
+    s === "success" ? "default" : s === "rejected" ? "destructive" : s === "pending" ? "secondary" : "outline";
+
+  return (
+    <div className="glass rounded-2xl p-4 sm:p-6">
+      <h2 className="text-xl font-semibold mb-4">Withdrawal Requests</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-left text-muted-foreground border-b">
+            <tr>
+              <th className="py-2 pr-4">User Email</th>
+              <th className="py-2 pr-4">Points</th>
+              <th className="py-2 pr-4">Amount</th>
+              <th className="py-2 pr-4">Method</th>
+              <th className="py-2 pr-4">Details</th>
+              <th className="py-2 pr-4">Status</th>
+              <th className="py-2 pr-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((w) => (
+              <tr key={w.id} className="border-b border-border/50 align-top">
+                <td className="py-2 pr-4">{w.email}</td>
+                <td className="py-2 pr-4">{w.points_spent.toLocaleString()}</td>
+                <td className="py-2 pr-4">{w.ton_amount}</td>
+                <td className="py-2 pr-4 uppercase">{w.method}</td>
+                <td className="py-2 pr-4 break-all max-w-[220px]">{w.payout_details ?? "—"}</td>
+                <td className="py-2 pr-4"><Badge variant={statusVariant(w.status) as any}>{w.status}</Badge></td>
+                <td className="py-2 pr-4">
+                  {w.status === "pending" ? (
+                    <div className="flex gap-2">
+                      <Button size="sm" disabled={busyId === w.id} onClick={() => act(w.id, "approve")}>
+                        {busyId === w.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve"}
+                      </Button>
+                      <Button size="sm" variant="destructive" disabled={busyId === w.id} onClick={() => act(w.id, "reject")}>
+                        Reject
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {w.processed_at ? new Date(w.processed_at).toLocaleString() : "—"}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No withdrawal requests</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
