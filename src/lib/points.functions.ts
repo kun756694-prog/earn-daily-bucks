@@ -187,7 +187,7 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
     const { data: rpc, error } = await supabase.rpc("admin_process_withdrawal", {
       _withdrawal_id: data.withdrawalId,
       _action: data.action,
-      _note: data.note ?? null,
+      _note: data.note,
     });
     if (error) safeError(error);
     const row = Array.isArray(rpc) ? rpc[0] : rpc;
