@@ -154,3 +154,43 @@ export const adminUserHistory = createServerFn({ method: "POST" })
       .limit(100);
     return { items: items ?? [] };
   });
+
+export const adminListWithdrawals = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+    if (!roles?.some((r) => r.role === "admin")) throw new Error("Forbidden");
+    const { data: ws } = await supabase
+      .from("withdrawals")
+      .select("id,user_id,method,payout_details,points_spent,ton_amount,status,admin_note,created_at,processed_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    const ids = Array.from(new Set((ws ?? []).map((w) => w.user_id)));
+    let emailById: Record<string, string> = {};
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id,email").in("id", ids);
+      emailById = Object.fromEntries((profs ?? []).map((p) => [p.id, p.email]));
+    }
+    return { items: (ws ?? []).map((w) => ({ ...w, email: emailById[w.user_id] ?? "—" })) };
+  });
+
+export const adminProcessWithdrawal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    withdrawalId: z.string().uuid(),
+    action: z.enum(["approve", "reject"]),
+    note: z.string().max(500).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: rpc, error } = await supabase.rpc("admin_process_withdrawal", {
+      _withdrawal_id: data.withdrawalId,
+      _action: data.action,
+      _note: data.note ?? null,
+    });
+    if (error) safeError(error);
+    const row = Array.isArray(rpc) ? rpc[0] : rpc;
+    if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
+    return { ok: true as const };
+  });
