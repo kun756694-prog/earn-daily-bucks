@@ -188,6 +188,13 @@ export type Database = {
         Args: { _delta: number; _reason: string; _target: string }
         Returns: number
       }
+      admin_process_withdrawal: {
+        Args: { _action: string; _note?: string; _withdrawal_id: string }
+        Returns: {
+          ok: boolean
+          reason: string
+        }[]
+      }
       claim_ad_reward_atomic: {
         Args: { _ad_type: string; _amount: number; _user_id: string }
         Returns: {
