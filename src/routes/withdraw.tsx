@@ -17,6 +17,8 @@ export const Route = createFileRoute("/withdraw")({
 
 const POINTS_PER_UNIT = 10000;
 const MIN_POINTS = 10000;
+const AD_URL = "https://www.profitablecpmratenetwork.com/ziadeax47?key=280244817897c83ce7c6542678cc971d";
+const AD_WAIT_SECONDS = 15;
 
 type MethodId = "wave" | "kbzpay" | "tng" | "duitnow" | "ton";
 
@@ -57,6 +59,25 @@ function WithdrawPage() {
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState<Row[]>([]);
+  const [adWatched, setAdWatched] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(0);
+
+  useEffect(() => {
+    if (adCountdown <= 0) return;
+    const t = setTimeout(() => {
+      setAdCountdown((c) => {
+        if (c <= 1) { setAdWatched(true); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [adCountdown]);
+
+  const watchAd = () => {
+    window.open(AD_URL, "_blank", "noopener,noreferrer");
+    setAdCountdown(AD_WAIT_SECONDS);
+    toast.info(`Watch the ad — unlock in ${AD_WAIT_SECONDS}s`);
+  };
 
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [loading, user, nav]);
 
@@ -80,6 +101,7 @@ function WithdrawPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!adWatched) { toast.error("Please watch the ad first to unlock withdrawal"); return; }
     if (belowMin) { toast.error(`You need at least ${MIN_POINTS.toLocaleString()} points`); return; }
     if (units < 1) { toast.error("Minimum withdrawal is 1 unit"); return; }
     if (cost > points) { toast.error("Not enough points"); return; }
@@ -99,6 +121,7 @@ function WithdrawPage() {
       } else {
         toast.success("Withdrawal request submitted — Pending review");
         setDetails("");
+        setAdWatched(false);
         await refreshProfile();
         await loadHistory();
       }
@@ -177,7 +200,20 @@ function WithdrawPage() {
             Double-check before submitting — payouts can't be reversed.
           </p>
         </div>
-        <Button type="submit" disabled={busy || belowMin || cost > points} className="w-full neon-glow">
+        <div className="rounded-xl border border-border p-3 space-y-2">
+          <div className="text-sm font-medium">
+            {adWatched ? "✅ Ad watched — withdrawal unlocked" : "Watch a short ad to unlock withdrawal"}
+          </div>
+          {!adWatched && (
+            <Button
+              type="button" variant="outline" className="w-full"
+              onClick={watchAd} disabled={adCountdown > 0}
+            >
+              {adCountdown > 0 ? `Waiting… ${adCountdown}s` : "Watch ad to unlock"}
+            </Button>
+          )}
+        </div>
+        <Button type="submit" disabled={busy || belowMin || cost > points || !adWatched} className="w-full neon-glow">
           {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           Request Withdrawal
         </Button>
