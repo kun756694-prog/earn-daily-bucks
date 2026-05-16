@@ -112,11 +112,10 @@ function CheckinCard({ profile, onDone }: { profile: any; onDone: () => Promise<
   const claim = async () => {
     setBusy(true);
     try {
-      openExternal(LINKS.checkin);
       const res = await fn();
-      if (!res.ok) toast.error("Already claimed today");
+      if (!res.ok) toast.error("Already claimed today — come back in 24h");
       else { toast.success("Check-in success +10 points"); await onDone(); }
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     finally { setBusy(false); }
   };
 
@@ -163,35 +162,27 @@ function WatchAdCard({ onDone }: { onDone: () => Promise<void> }) {
 }
 
 function OffersCard() {
-  const track = useServerFn(startTask);
-  const open = async () => {
-    openExternal(LINKS.offers);
-    try { await track({ data: { taskId: "card_offers" } }); } catch {}
-    toast.success("Offer opened — complete it to earn points");
-  };
   return (
     <Card>
       <Target className="h-8 w-8 text-primary mb-3" />
       <h3 className="font-semibold text-lg">Complete Offers</h3>
-      <p className="text-sm text-muted-foreground mt-1 mb-4">Earn up to 500 points per offer.</p>
-      <Button variant="outline" className="w-full mt-auto" onClick={open}>Open offer wall</Button>
+      <p className="text-sm text-muted-foreground mt-1 mb-4">Open the tasks page to earn points.</p>
+      <Link to="/tasks" className="mt-auto">
+        <Button variant="outline" className="w-full">Go to tasks</Button>
+      </Link>
     </Card>
   );
 }
 
 function TasksCard() {
-  const track = useServerFn(startTask);
-  const open = async () => {
-    openExternal(LINKS.tasks);
-    try { await track({ data: { taskId: "card_tasks" } }); } catch {}
-    toast.success("Task opened — complete it to earn points");
-  };
   return (
     <Card>
       <Youtube className="h-8 w-8 text-primary mb-3" />
       <h3 className="font-semibold text-lg">Video Tasks</h3>
-      <p className="text-sm text-muted-foreground mt-1 mb-4">Watch ad + video. +20 per task.</p>
-      <Button variant="outline" className="w-full mt-auto" onClick={open}>Open tasks</Button>
+      <p className="text-sm text-muted-foreground mt-1 mb-4">Open each task, wait 30s, claim +10.</p>
+      <Link to="/tasks" className="mt-auto">
+        <Button variant="outline" className="w-full">Open tasks page</Button>
+      </Link>
     </Card>
   );
 }
