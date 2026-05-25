@@ -194,3 +194,41 @@ export const adminProcessWithdrawal = createServerFn({ method: "POST" })
     if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
     return { ok: true as const };
   });
+
+export const submitAirdropClaim = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      discordUsername: z.string().trim().min(2).max(64).regex(/^[A-Za-z0-9._#-]+$/),
+      walletAddress: z.string().trim().min(26).max(64).regex(/^0x[a-fA-F0-9]{40}$/, { message: "Invalid Arbitrum wallet address" }),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase.from("withdraw_requests").insert({
+      user_id: userId,
+      discord_username: data.discordUsername,
+      wallet_address: data.walletAddress,
+    });
+    if (error) safeError(error);
+
+    const webhook = process.env.DISCORD_WEBHOOK_URL;
+    if (webhook) {
+      try {
+        await fetch(webhook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content:
+              `🚀 **New Airdrop Claim Request**\n` +
+              `👤 Discord User: ${data.discordUsername}\n` +
+              `💰 Wallet Address: \`${data.walletAddress}\`\n` +
+              `Please verify this user in the database.`,
+          }),
+        });
+      } catch (e) {
+        console.error("[discord-webhook]", e);
+      }
+    }
+    return { ok: true as const };
+  });
