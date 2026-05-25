@@ -137,6 +137,33 @@ export type Database = {
         }
         Relationships: []
       }
+      withdraw_requests: {
+        Row: {
+          created_at: string
+          discord_username: string
+          id: string
+          status: string
+          user_id: string
+          wallet_address: string
+        }
+        Insert: {
+          created_at?: string
+          discord_username: string
+          id?: string
+          status?: string
+          user_id: string
+          wallet_address: string
+        }
+        Update: {
+          created_at?: string
+          discord_username?: string
+          id?: string
+          status?: string
+          user_id?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
       withdrawals: {
         Row: {
           admin_note: string | null
