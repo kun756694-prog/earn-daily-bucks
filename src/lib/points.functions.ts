@@ -32,7 +32,7 @@ export const claimAdReward = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: rpc, error } = await supabase.rpc("claim_ad_reward_atomic", {
-      _user_id: userId, _ad_type: data.adType, _amount: 20,
+      _user_id: userId, _ad_type: data.adType,
     });
     if (error) safeError(error);
     const row = Array.isArray(rpc) ? rpc[0] : rpc;
@@ -69,7 +69,7 @@ export const claimBonusReward = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { data: rpc, error } = await supabase.rpc("claim_bonus_reward_atomic", {
-      _user_id: userId, _amount: 10,
+      _user_id: userId,
     });
     if (error) safeError(error);
     const row = Array.isArray(rpc) ? rpc[0] : rpc;
