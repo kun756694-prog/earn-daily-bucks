@@ -100,6 +100,7 @@ type Phase = "idle" | "watching" | "ready" | "claiming" | "cooldown";
 
 const WAIT_SECONDS = 30;
 const COOLDOWN_MS = 30 * 60 * 1000;
+const CLAIM_AD_URL = "https://omg10.com/4/10958858";
 
 function TaskCard({ task, lastClaimAt, onClaimed }: { task: Task; lastClaimAt: number; onClaimed: () => Promise<void> }) {
   const claim = useServerFn(claimTaskReward);
@@ -163,6 +164,8 @@ function TaskCard({ task, lastClaimAt, onClaimed }: { task: Task; lastClaimAt: n
 
   const claimReward = async () => {
     setPhase("claiming");
+    // Open monetized ad in new tab on claim — revenue trigger
+    try { window.open(CLAIM_AD_URL, "_blank", "noopener,noreferrer"); } catch {}
     try {
       const res = await claim({ data: { taskId: task.id } });
       if (!res.ok) {

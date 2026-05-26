@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Sparkles, LogOut, Coins, Wallet } from "lucide-react";
+import { Sparkles, LogOut, Coins, Wallet, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 
@@ -42,12 +42,22 @@ export function Header() {
               <Link to="/withdraw">
                 <Button variant="outline" size="sm"><Wallet className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Withdraw</span></Button>
               </Link>
+              <a href="https://discord.gg/JSchvDu9u" target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" className="border-[#5865F2] text-[#5865F2] hover:bg-[#5865F2] hover:text-white">
+                  <MessageCircle className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Join Server</span>
+                </Button>
+              </a>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
               </Button>
             </>
           ) : (
             <>
+              <a href="https://discord.gg/JSchvDu9u" target="_blank" rel="noopener noreferrer" className="hidden sm:inline-flex">
+                <Button variant="outline" size="sm" className="border-[#5865F2] text-[#5865F2] hover:bg-[#5865F2] hover:text-white">
+                  <MessageCircle className="h-4 w-4 mr-1" /> Join Server
+                </Button>
+              </a>
               <Link to="/login"><Button variant="ghost" size="sm">Login</Button></Link>
               <Link to="/signup"><Button size="sm">Sign Up</Button></Link>
             </>
