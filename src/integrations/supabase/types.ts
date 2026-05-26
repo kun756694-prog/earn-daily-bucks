@@ -223,7 +223,7 @@ export type Database = {
         }[]
       }
       claim_ad_reward_atomic: {
-        Args: { _ad_type: string; _amount: number; _user_id: string }
+        Args: { _ad_type: string; _user_id: string }
         Returns: {
           ok: boolean
           points: number
@@ -231,7 +231,7 @@ export type Database = {
         }[]
       }
       claim_bonus_reward_atomic: {
-        Args: { _amount: number; _user_id: string }
+        Args: { _user_id: string }
         Returns: {
           ok: boolean
           points: number

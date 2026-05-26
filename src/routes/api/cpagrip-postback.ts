@@ -37,20 +37,18 @@ async function handle(request: Request) {
   if (!Number.isFinite(payout) || payout <= 0 || payout > MAX_PAYOUT) {
     return new Response("Bad request", { status: 400 });
   }
-  if (txid.length > 128 || !/^[\w:.\-]*$/.test(txid)) {
+  if (!txid || txid.length > 128 || !/^[\w:.\-]+$/.test(txid)) {
     return new Response("Invalid txid", { status: 400 });
   }
 
   // Idempotency: skip if this txid was already credited
-  if (txid) {
-    const { data: existing } = await supabaseAdmin
-      .from("points_transactions")
-      .select("id")
-      .eq("type", "offer")
-      .eq("reason", `cpagrip:${txid}`)
-      .maybeSingle();
-    if (existing) return new Response("OK (duplicate)", { status: 200 });
-  }
+  const { data: existing } = await supabaseAdmin
+    .from("points_transactions")
+    .select("id")
+    .eq("type", "offer")
+    .eq("reason", `cpagrip:${txid}`)
+    .maybeSingle();
+  if (existing) return new Response("OK (duplicate)", { status: 200 });
 
   const points = Math.round(payout * 100); // $1 = 100 pts
 
@@ -64,7 +62,7 @@ async function handle(request: Request) {
     user_id: userId,
     amount: points,
     type: "offer",
-    reason: txid ? `cpagrip:${txid}` : "cpagrip offer",
+    reason: `cpagrip:${txid}`,
   });
 
   return new Response("OK", { status: 200 });
