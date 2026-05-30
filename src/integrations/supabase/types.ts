@@ -247,7 +247,7 @@ export type Database = {
         }[]
       }
       claim_task_reward_atomic: {
-        Args: { _amount: number; _task_id: string; _user_id: string }
+        Args: { _task_id: string; _user_id: string }
         Returns: {
           ok: boolean
           points: number
