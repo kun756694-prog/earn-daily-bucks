@@ -56,8 +56,9 @@ export const claimTaskReward = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: rpc, error } = await supabase.rpc("claim_task_reward_atomic", {
-      _user_id: userId, _task_id: data.taskId, _amount: 20,
-    });
+      _user_id: userId,
+      _task_id: data.taskId,
+    } as never);
     if (error) safeError(error);
     const row = Array.isArray(rpc) ? rpc[0] : rpc;
     if (!row?.ok) return { ok: false as const, reason: row?.reason ?? "error" };
